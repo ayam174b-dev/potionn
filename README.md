@@ -1,54 +1,111 @@
-# Remotion video
+# potionn
 
-<p align="center">
-  <a href="https://github.com/remotion-dev/logo">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/remotion-dev/logo/raw/main/animated-logo-banner-dark.apng">
-      <img alt="Animated Remotion Logo" src="https://github.com/remotion-dev/logo/raw/main/animated-logo-banner-light.gif">
-    </picture>
-  </a>
-</p>
+Procedural stock video generator built with [Remotion](https://www.remotion.dev/).
 
-Welcome to your Remotion project!
+Every render is driven by a numeric/string **seed**. The seed picks a colour
+palette family, decides which visual layers appear (orbs, polygons,
+particles, ribbons, grid), and sets the motion parameters for each one.
+Same seed in → same video out. Different seeds → visually distinct videos,
+so you can generate as many unique stock clips as you need without
+producing near-duplicates.
 
-## Commands
+## Quick start
 
-**Install Dependencies**
-
-```console
-npm i
+```bash
+npm install
+npm run dev        # opens Remotion Studio for interactive preview
 ```
 
-**Start Preview**
+In the Studio, change the `seed` prop in the right sidebar to see different
+variations instantly.
 
-```console
-npm run dev
+## Rendering
+
+The render script wraps Remotion's programmatic API and writes results to
+`./out/`.
+
+```bash
+# Default: 10 second 1080p MP4 with high quality (~30MB)
+npm run render
+
+# Specific seed (reproducible)
+npm run render -- --seed sunset-42
+
+# 15 second video
+npm run render -- --duration 15
+
+# MOV (ProRes HQ) — visually lossless, large file (~150MB+ for 10s)
+npm run render -- --codec mov
+
+# Render 5 different stock videos in a row
+npm run render -- --count 5
+
+# Maximum bitrate
+npm run render -- --quality max
 ```
 
-**Render video**
+### Options
 
-```console
-npx remotion render
+| Flag | Default | Description |
+|---|---|---|
+| `--seed <string>` | random | PRNG seed; same seed produces the same video. |
+| `--duration <seconds>` | `10` | Video length, 1–120 seconds. |
+| `--codec <mp4\|mov>` | `mp4` | Container. `mov` uses ProRes HQ. |
+| `--quality <low\|standard\|high\|max>` | `high` | Bitrate preset. |
+| `--bitrate <e.g. 25M>` | preset | Manual video bitrate (MP4 only). |
+| `--count <n>` | `1` | Render N videos with different random seeds. |
+| `--out <path>` | `out/stock-<seed>.<ext>` | Custom output path (single render only). |
+
+### File-size guarantees
+
+The requirement is a minimum of **20 MB per video**. The render script
+forces a video bitrate high enough that, at the default resolution and
+duration, every output reliably clears that threshold:
+
+| Quality | Bitrate | 10 s MP4 size (1080p) |
+|---|---|---|
+| `low`      | 16 Mb/s | ~20 MB |
+| `standard` | 24 Mb/s | ~30 MB |
+| `high`     | 32 Mb/s | ~40 MB |
+| `max`      | 60 Mb/s | ~75 MB |
+| `mov` (ProRes HQ) | n/a | ~150–250 MB |
+
+If a render comes in under 20 MB (e.g. very short durations), the script
+prints a warning suggesting `--quality max` or a manual `--bitrate`.
+
+## Project layout
+
+```
+src/
+  Root.tsx                  Composition registry (calculateMetadata sets duration)
+  StockVideo/
+    index.tsx               Top-level composition wiring all layers
+    schema.ts               Input props (seed, durationInSeconds)
+    random.ts               Deterministic mulberry32 PRNG
+    palette.ts              Procedural palette families (neon, sunset, ocean, ...)
+    scene.ts                Plans every layer's parameters from a seeded RNG
+    layers/
+      Background.tsx        Radial / linear / conic / mesh gradients
+      Orbs.tsx              Soft glowing animated orbs
+      Polygons.tsx          Rotating geometric polygons
+      Particles.tsx         Drifting twinkling particles
+      Ribbons.tsx           Flowing sine ribbons
+      Grid.tsx              Optional drifting grid
+      Vignette.tsx          Edge falloff
+      Noise.tsx             Film grain overlay
+scripts/
+  render.mjs                Programmatic render CLI
 ```
 
-**Upgrade Remotion**
+## How variation works
 
-```console
-npx remotion upgrade
-```
-
-## Docs
-
-Get started with Remotion by reading the [fundamentals page](https://www.remotion.dev/docs/the-fundamentals).
-
-## Help
-
-We provide help on our [Discord server](https://discord.gg/6VzzNDwUwV).
-
-## Issues
-
-Found an issue with Remotion? [File an issue here](https://github.com/remotion-dev/remotion/issues/new).
+`planScene(rng, width, height)` reads from a seeded PRNG and produces a
+fully described scene plan: which background style, how many orbs, where
+particles start, ribbon frequencies, whether a grid is shown, the
+palette, the noise intensity, the camera sway. Every layer component
+reads from this plan only — it does not call the RNG itself — so the
+visuals are pure functions of `(seed, frame)`.
 
 ## License
 
-Note that for some entities a company license is needed. [Read the terms here](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md).
+UNLICENSED — private project scaffolded from `create-video`.
