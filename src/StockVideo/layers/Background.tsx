@@ -1,6 +1,7 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 import type { ScenePlan } from "../scene";
+import { withAlpha } from "../palette";
 
 type Props = {
   plan: ScenePlan;
@@ -23,14 +24,17 @@ export const Background: React.FC<Props> = ({ plan, fps }) => {
     case "conic":
       backgroundImage = `conic-gradient(from ${angle}deg at 50% 50%, ${c1}, ${c2}, ${c1})`;
       break;
-    case "mesh":
+    case "mesh": {
+      const a0 = withAlpha(plan.palette.accents[0], 0.25);
+      const a1 = withAlpha(plan.palette.accents[1] ?? plan.palette.accents[0], 0.25);
       backgroundImage = [
         `radial-gradient(at 20% 30%, ${c1} 0%, transparent 60%)`,
         `radial-gradient(at 80% 70%, ${c2} 0%, transparent 65%)`,
-        `radial-gradient(at 60% 20%, ${plan.palette.accents[0]}40 0%, transparent 55%)`,
-        `radial-gradient(at 30% 85%, ${plan.palette.accents[1] ?? c1}40 0%, transparent 55%)`,
+        `radial-gradient(at 60% 20%, ${a0} 0%, transparent 55%)`,
+        `radial-gradient(at 30% 85%, ${a1} 0%, transparent 55%)`,
       ].join(", ");
       break;
+    }
     case "linear":
     default:
       backgroundImage = `linear-gradient(${angle}deg, ${c1}, ${c2})`;

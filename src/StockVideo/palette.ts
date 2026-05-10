@@ -102,6 +102,22 @@ const FAMILIES: PaletteFamily[] = [
 const hsl = (h: number, s: number, l: number, a = 1): string =>
   `hsla(${((h % 360) + 360) % 360}, ${s}%, ${l}%, ${a})`;
 
+/**
+ * Rewrite the alpha channel of an `hsla(...)` colour string.
+ *
+ * Palette colours come back as `hsla(h, s%, l%, a)`. CSS rejects the hex
+ * trick of suffixing `40` for 25% alpha against `hsla()` values, so this
+ * helper produces a valid replacement.
+ */
+export const withAlpha = (color: string, alpha: number): string => {
+  const match = color.match(
+    /^hsla?\(\s*([^,]+),\s*([^,]+),\s*([^,]+)(?:,\s*[^)]+)?\)$/i,
+  );
+  if (!match) return color;
+  const [, h, s, l] = match;
+  return `hsla(${h}, ${s}, ${l}, ${alpha})`;
+};
+
 export const createPalette = (rng: Rng): Palette => {
   const family = rng.pick(FAMILIES);
   const baseHue = family.hueBase + rng.range(-15, 15);
