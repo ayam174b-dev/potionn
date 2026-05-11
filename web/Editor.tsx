@@ -411,8 +411,12 @@ const RibbonsSection: React.FC<{
             }
           />
           <NumberRow
+            // The seed generator picks a sign at random, so half of all
+            // seed-derived ribbons have a negative speed (they wave in
+            // reverse). The slider must span both signs or it would
+            // silently clamp negative speeds to 0 on first interaction.
             label="speed"
-            min={0}
+            min={-3}
             max={3}
             step={0.05}
             value={r.speed}
