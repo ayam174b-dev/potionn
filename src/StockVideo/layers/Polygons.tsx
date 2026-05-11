@@ -29,7 +29,8 @@ const buildPolygonPath = (
 export const Polygons: React.FC<Props> = ({ plan, width, height, fps }) => {
   const frame = useCurrentFrame();
   const t = frame / fps;
-  if (plan.polygons.length === 0) return null;
+  const visible = plan.polygons.filter((p) => !p.hidden);
+  if (visible.length === 0) return null;
 
   return (
     <AbsoluteFill>
@@ -39,7 +40,7 @@ export const Polygons: React.FC<Props> = ({ plan, width, height, fps }) => {
         height={height}
         style={{ position: "absolute", inset: 0 }}
       >
-        {plan.polygons.map((poly, i) => {
+        {visible.map((poly, i) => {
           const rotation = poly.startRotation + t * poly.rotationSpeed;
           const breath = 1 + Math.sin(t * 0.8 + i) * 0.06;
           const r = poly.radius * breath;

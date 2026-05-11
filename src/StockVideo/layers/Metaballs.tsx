@@ -25,8 +25,10 @@ type Props = {
  */
 export const Metaballs: React.FC<Props> = ({ plan, width, height, fps }) => {
   const frame = useCurrentFrame();
-  if (!plan.metaballs) return null;
+  if (!plan.metaballs || plan.metaballs.hidden) return null;
   const cfg = plan.metaballs;
+  const balls = cfg.balls.filter((b) => !b.hidden);
+  if (balls.length === 0) return null;
   const t = frame / fps;
   const filterId = `metaballs-filter`;
 
@@ -56,7 +58,7 @@ export const Metaballs: React.FC<Props> = ({ plan, width, height, fps }) => {
           </filter>
         </defs>
         <g filter={`url(#${filterId})`} opacity={0.75}>
-          {cfg.balls.map((b, i) => {
+          {balls.map((b, i) => {
             const x = b.cx + Math.sin(t * b.speed + b.phaseX) * b.driftX;
             const y =
               b.cy + Math.cos(t * b.speed * 0.81 + b.phaseY) * b.driftY;

@@ -10,7 +10,7 @@ type Props = {
 export const Grid: React.FC<Props> = ({ plan, fps }) => {
   const frame = useCurrentFrame();
   const t = frame / fps;
-  if (!plan.grid) return null;
+  if (!plan.grid || plan.grid.hidden) return null;
   const { cellSize, rotation, driftSpeed, color, opacity, pulseSpeed } =
     plan.grid;
   const pulse = 0.7 + 0.3 * Math.sin(t * pulseSpeed);
