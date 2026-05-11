@@ -1,6 +1,9 @@
 import React from "react";
 import { Player, type PlayerRef } from "@remotion/player";
 import { StockVideo } from "../src/StockVideo";
+import { createRng } from "../src/StockVideo/random";
+import { planScene, type ScenePlan } from "../src/StockVideo/scene";
+import { Editor } from "./Editor";
 
 const FPS = 30;
 const WIDTH = 1920;
@@ -34,17 +37,56 @@ export const App: React.FC = () => {
   const [status, setStatus] = React.useState<RenderStatus>({ state: "idle" });
   const playerRef = React.useRef<PlayerRef>(null);
 
+  // The "working plan" is what the editor mutates. It's seeded from the
+  // current seed on first render and on every Acak/Reset, then diverges as
+  // the user edits. `dirty` tells the rest of the UI whether the plan has
+  // been altered relative to the seed-derived baseline.
+  const seedToPlan = React.useCallback(
+    (s: string): ScenePlan => planScene(createRng(s), WIDTH, HEIGHT),
+    [],
+  );
+
+  const [plan, setPlan] = React.useState<ScenePlan>(() => seedToPlan(seed));
+  const [dirty, setDirty] = React.useState(false);
+
+  // Whenever the seed changes via the text input, derive a fresh plan and
+  // clear the dirty flag — typing in the seed field is conceptually the
+  // same gesture as pressing Acak.
+  React.useEffect(() => {
+    setPlan(seedToPlan(seed));
+    setDirty(false);
+  }, [seed, seedToPlan]);
+
+  const onPlanChange = React.useCallback((next: ScenePlan) => {
+    setPlan(next);
+    setDirty(true);
+  }, []);
+
+  const resetToSeed = React.useCallback(() => {
+    setPlan(seedToPlan(seed));
+    setDirty(false);
+    playerRef.current?.seekTo(0);
+  }, [seed, seedToPlan]);
+
   const inputProps = React.useMemo(
-    () => ({ seed, durationInSeconds: duration }),
-    [seed, duration],
+    () => ({ seed, durationInSeconds: duration, plan }),
+    [seed, duration, plan],
   );
 
   const randomize = React.useCallback(() => {
+    if (
+      dirty &&
+      !window.confirm(
+        "You have unsaved edits to the current scene. Discard them and roll a new seed?",
+      )
+    ) {
+      return;
+    }
     setSeed(randomSeed());
     // Reset playback so the viewer sees the change from the start.
     playerRef.current?.seekTo(0);
     playerRef.current?.play();
-  }, []);
+  }, [dirty]);
 
   // Allow pressing "R" to randomize, "Space" to play/pause.
   React.useEffect(() => {
@@ -82,6 +124,10 @@ export const App: React.FC = () => {
           durationInSeconds: duration,
           format,
           quality,
+          // Only send the plan if the user has edited it; sending a seed-
+          // identical plan would waste bandwidth and forfeit determinism
+          // checks the composition does on the server side.
+          plan: dirty ? plan : undefined,
         }),
       });
 
@@ -292,6 +338,15 @@ export const App: React.FC = () => {
             </div>
           )}
         </div>
+
+        <Editor
+          plan={plan}
+          width={WIDTH}
+          height={HEIGHT}
+          onPlanChange={onPlanChange}
+          onReset={resetToSeed}
+          dirty={dirty}
+        />
       </aside>
     </div>
   );

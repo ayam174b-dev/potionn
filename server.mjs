@@ -65,7 +65,10 @@ const sanitizeSeed = (raw) => {
 };
 
 const app = express();
-app.use(express.json({ limit: "1mb" }));
+// Scene plans serialised from the editor can run to ~50 KB once they
+// include all orbs, polygons, ribbons and metaballs. 4 MB is generous
+// headroom and still prevents accidental DOS from runaway payloads.
+app.use(express.json({ limit: "4mb" }));
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
@@ -81,6 +84,13 @@ app.post("/api/render", async (req, res) => {
   const format = req.body?.format === "mov" ? "mov" : "mp4";
   const qualityKey = String(req.body?.quality ?? "high");
   const preset = QUALITY_PRESETS[qualityKey] ?? QUALITY_PRESETS.high;
+  // Pass-through for an editor-supplied scene plan. We don't validate the
+  // shape on the server — the Remotion composition will simply use what
+  // it's given, and at worst the editor sends back a plan that the
+  // composition is robust against (missing fields fall back to seed-only
+  // path on the React side).
+  const plan =
+    req.body?.plan && typeof req.body.plan === "object" ? req.body.plan : null;
 
   const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), "potionn-"));
   const outPath = path.join(tmpDir, `stock-${seed}.${format}`);
@@ -88,15 +98,16 @@ app.post("/api/render", async (req, res) => {
   const codec = isMov ? "prores" : "h264";
 
   console.log(
-    `[potionn] render seed=${seed} duration=${durationInSeconds}s format=${format} quality=${qualityKey}`,
+    `[potionn] render seed=${seed} duration=${durationInSeconds}s format=${format} quality=${qualityKey}${plan ? " plan=custom" : ""}`,
   );
 
   try {
     const serveUrl = await getServeUrl();
+    const inputProps = { seed, durationInSeconds, plan };
     const composition = await selectComposition({
       serveUrl,
       id: "StockVideo",
-      inputProps: { seed, durationInSeconds },
+      inputProps,
     });
 
     await renderMedia({
@@ -104,7 +115,7 @@ app.post("/api/render", async (req, res) => {
       serveUrl,
       codec,
       outputLocation: outPath,
-      inputProps: { seed, durationInSeconds },
+      inputProps,
       videoBitrate: isMov ? undefined : preset.bitrate,
       proResProfile: isMov ? "hq" : undefined,
       pixelFormat: isMov ? "yuv422p10le" : "yuv420p",

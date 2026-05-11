@@ -25,6 +25,7 @@ export type OrbConfig = {
   speed: number;
   blur: number;
   opacity: number;
+  hidden?: boolean;
 };
 
 export type PolygonConfig = {
@@ -37,6 +38,7 @@ export type PolygonConfig = {
   color: string;
   strokeWidth: number;
   opacity: number;
+  hidden?: boolean;
 };
 
 export type ParticleConfig = {
@@ -62,6 +64,7 @@ export type RibbonConfig = {
   yCenter: number;
   color: string;
   opacity: number;
+  hidden?: boolean;
 };
 
 export type GridConfig = {
@@ -71,6 +74,7 @@ export type GridConfig = {
   color: string;
   opacity: number;
   pulseSpeed: number;
+  hidden?: boolean;
 };
 
 export type LightRaysConfig = {
@@ -88,6 +92,7 @@ export type LightRaysConfig = {
   opacity: number;
   pulseSpeed: number;
   blur: number;
+  hidden?: boolean;
 };
 
 export type MetaballConfig = {
@@ -99,6 +104,7 @@ export type MetaballConfig = {
   phaseX: number;
   phaseY: number;
   speed: number;
+  hidden?: boolean;
 };
 
 export type MetaballsPlan = {
@@ -106,6 +112,7 @@ export type MetaballsPlan = {
   threshold: number;
   blur: number;
   balls: MetaballConfig[];
+  hidden?: boolean;
 };
 
 export type FlowfieldConfig = {

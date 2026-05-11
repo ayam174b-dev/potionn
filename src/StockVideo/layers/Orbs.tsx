@@ -13,7 +13,7 @@ export const Orbs: React.FC<Props> = ({ plan, fps }) => {
 
   return (
     <AbsoluteFill style={{ mixBlendMode: "screen" }}>
-      {plan.orbs.map((orb, i) => {
+      {plan.orbs.filter((o) => !o.hidden).map((orb, i) => {
         const x = orb.cx + Math.sin(t * orb.speed + orb.phaseX) * orb.driftX;
         const y = orb.cy + Math.cos(t * orb.speed * 0.83 + orb.phaseY) * orb.driftY;
         const breath = 1 + Math.sin(t * orb.speed * 0.6 + i) * 0.08;

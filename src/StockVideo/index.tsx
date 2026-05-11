@@ -22,13 +22,16 @@ import type { StockVideoProps } from "./schema";
 
 const EASE = Easing.bezier(0.4, 0, 0.2, 1);
 
-export const StockVideo: React.FC<StockVideoProps> = ({ seed }) => {
+export const StockVideo: React.FC<StockVideoProps> = ({ seed, plan: providedPlan }) => {
   const { width, height, fps, durationInFrames } = useVideoConfig();
   const frame = useCurrentFrame();
 
+  // Two ways to render: from a seed (procedural) or from an explicit
+  // scene plan (editor-edited). An explicit plan always wins so that the
+  // shape editor's edits are honoured byte-for-byte.
   const plan = useMemo(
-    () => planScene(createRng(seed), width, height),
-    [seed, width, height],
+    () => providedPlan ?? planScene(createRng(seed), width, height),
+    [providedPlan, seed, width, height],
   );
 
   const t = frame / fps;

@@ -33,7 +33,8 @@ const buildRibbonPath = (
 export const Ribbons: React.FC<Props> = ({ plan, width, height, fps }) => {
   const frame = useCurrentFrame();
   const t = frame / fps;
-  if (plan.ribbons.length === 0) return null;
+  const visible = plan.ribbons.filter((r) => !r.hidden);
+  if (visible.length === 0) return null;
 
   return (
     <AbsoluteFill style={{ mixBlendMode: "screen" }}>
@@ -43,7 +44,7 @@ export const Ribbons: React.FC<Props> = ({ plan, width, height, fps }) => {
         height={height}
         style={{ position: "absolute", inset: 0 }}
       >
-        {plan.ribbons.map((r, i) => {
+        {visible.map((r, i) => {
           const phase = r.phase + t * r.speed;
           const d = buildRibbonPath(
             width,

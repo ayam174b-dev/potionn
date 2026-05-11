@@ -19,7 +19,7 @@ type Props = {
  */
 export const LightRays: React.FC<Props> = ({ plan, width, height, fps }) => {
   const frame = useCurrentFrame();
-  if (!plan.lightRays) return null;
+  if (!plan.lightRays || plan.lightRays.hidden) return null;
   const cfg = plan.lightRays;
   const t = frame / fps;
 
