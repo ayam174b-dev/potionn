@@ -13,11 +13,29 @@ producing near-duplicates.
 
 ```bash
 npm install
-npm run dev        # opens Remotion Studio for interactive preview
+npm run dev        # starts preview UI (http://localhost:5173) + render API (4000)
 ```
 
-In the Studio, change the `seed` prop in the right sidebar to see different
-variations instantly.
+Open <http://localhost:5173>. You get:
+
+- A **live preview** of the composition using `@remotion/player`.
+- A big **Acak** (randomize) button — each click rolls a new seed and gives
+  you a visually distinct clip. Keyboard: <kbd>R</kbd> randomize,
+  <kbd>Space</kbd> play/pause.
+- A **duration slider** clamped to **10–30 seconds**.
+- An **Export** panel with format (MP4 H.264 / MOV ProRes HQ) and quality
+  preset. Clicking "Render & download" runs the Remotion renderer on the
+  Express server and streams the file back to your browser.
+
+If you prefer the standard Remotion editor, `npm run dev:studio` still
+opens Remotion Studio.
+
+### Production build
+
+```bash
+npm run build      # vite builds the UI into dist-web/
+npm run start      # Express serves the UI + render API on port 4000
+```
 
 ## Rendering
 
@@ -76,9 +94,9 @@ prints a warning suggesting `--quality max` or a manual `--bitrate`.
 ## Project layout
 
 ```
-src/
+src/                        Remotion composition (rendered both in the
   Root.tsx                  Composition registry (calculateMetadata sets duration)
-  StockVideo/
+  StockVideo/               browser preview and the server-side render)
     index.tsx               Top-level composition wiring all layers
     schema.ts               Input props (seed, durationInSeconds)
     random.ts               Deterministic mulberry32 PRNG
@@ -93,8 +111,15 @@ src/
       Grid.tsx              Optional drifting grid
       Vignette.tsx          Edge falloff
       Noise.tsx             Film grain overlay
+web/                        Vite + React preview UI
+  index.html
+  main.tsx
+  App.tsx                   Player + Acak button + duration slider + export
+  styles.css
+server.mjs                  Express render API (POST /api/render → MP4/MOV)
 scripts/
-  render.mjs                Programmatic render CLI
+  render.mjs                Programmatic render CLI (still supported)
+vite.config.ts              Dev server proxies /api → http://localhost:4000
 ```
 
 ## How variation works
