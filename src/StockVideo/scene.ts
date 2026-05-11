@@ -44,11 +44,13 @@ export type ParticleConfig = {
   y: number;
   size: number;
   speed: number;
-  angle: number;
   color: string;
   blur: number;
   twinkleSpeed: number;
   twinklePhase: number;
+  // Personal offset into the shared flowfield, so two particles starting at
+  // the same place still drift apart.
+  fieldOffset: number;
 };
 
 export type RibbonConfig = {
@@ -71,6 +73,89 @@ export type GridConfig = {
   pulseSpeed: number;
 };
 
+export type LightRaysConfig = {
+  // Origin of the rays expressed in normalised 0-1 space (off-screen origins
+  // — e.g. cx < 0 or > 1 — feel more cinematic).
+  cx: number;
+  cy: number;
+  count: number;
+  spreadDeg: number;
+  baseAngleDeg: number;
+  rotateSpeed: number;
+  beamWidth: number;
+  length: number;
+  color: string;
+  opacity: number;
+  pulseSpeed: number;
+  blur: number;
+};
+
+export type MetaballConfig = {
+  cx: number;
+  cy: number;
+  radius: number;
+  driftX: number;
+  driftY: number;
+  phaseX: number;
+  phaseY: number;
+  speed: number;
+};
+
+export type MetaballsPlan = {
+  color: string;
+  threshold: number;
+  blur: number;
+  balls: MetaballConfig[];
+};
+
+export type FlowfieldConfig = {
+  // Spatial scale of the value-noise field. Larger = smoother, broader swirls.
+  scale: number;
+  // How aggressively a particle is pulled along the field direction.
+  strength: number;
+  // Time evolution of the field — makes the field itself "breathe".
+  timeDrift: number;
+};
+
+export type CameraConfig = {
+  // Base scale held throughout the clip.
+  baseScale: number;
+  // How much the scale ramps from start to end.
+  zoomDelta: number;
+  // Pan in normalised units of the longest side.
+  panX: number;
+  panY: number;
+  // Subtle tilt in radians applied uniformly.
+  tilt: number;
+  // Direction in which `zoomDelta` is applied: 1 = push in, -1 = pull out.
+  direction: 1 | -1;
+};
+
+export type RevealConfig = {
+  // Opener (0..1 progress through the first second(ish)).
+  inFrames: number;
+  inStartScale: number;
+  // Closer (last few frames).
+  outFrames: number;
+};
+
+export type EvolutionConfig = {
+  // Total hue rotation in degrees across the entire clip.
+  hueShiftDeg: number;
+  // Saturation pulse depth (0 = none, 0.1 = ±10%).
+  saturationPulse: number;
+};
+
+export type BloomConfig = {
+  // Bloom blur radius in CSS pixels (used by feGaussianBlur stdDeviation).
+  blur: number;
+  // Brightness multiplier applied to the blurred copy. Values >1 brighten
+  // the glow; <1 leave the image untouched but blurred.
+  brightness: number;
+  // 0..1, opacity of the glow halo composed on top of the source.
+  intensity: number;
+};
+
 export type ScenePlan = {
   palette: Palette;
   background: {
@@ -83,15 +168,18 @@ export type ScenePlan = {
   particles: ParticleConfig[];
   ribbons: RibbonConfig[];
   grid: GridConfig | null;
+  lightRays: LightRaysConfig | null;
+  metaballs: MetaballsPlan | null;
   noise: {
     intensity: number;
     scale: number;
   };
   vignette: number;
-  cameraSway: {
-    amplitude: number;
-    frequency: number;
-  };
+  flowfield: FlowfieldConfig;
+  camera: CameraConfig;
+  reveal: RevealConfig;
+  evolution: EvolutionConfig;
+  bloom: BloomConfig;
 };
 
 export const planScene = (rng: Rng, width: number, height: number): ScenePlan => {
@@ -125,7 +213,7 @@ export const planScene = (rng: Rng, width: number, height: number): ScenePlan =>
   }
 
   const polyRng = rng.fork("polygons");
-  const polygonCount = polyRng.bool(0.7) ? polyRng.int(2, 6) : 0;
+  const polygonCount = polyRng.bool(0.65) ? polyRng.int(2, 6) : 0;
   const polygons: PolygonConfig[] = [];
   for (let i = 0; i < polygonCount; i++) {
     polygons.push({
@@ -142,19 +230,22 @@ export const planScene = (rng: Rng, width: number, height: number): ScenePlan =>
   }
 
   const particleRng = rng.fork("particles");
-  const particleCount = particleRng.int(80, 220);
+  // Trailed particles are visually denser than the old straight dots, so we
+  // ship a slightly lower headcount to keep the composition readable and the
+  // SVG layer cheap.
+  const particleCount = particleRng.int(60, 140);
   const particles: ParticleConfig[] = [];
   for (let i = 0; i < particleCount; i++) {
     particles.push({
       x: particleRng.range(0, 1) * width,
       y: particleRng.range(0, 1) * height,
       size: particleRng.range(1.5, 5),
-      speed: particleRng.range(0.05, 0.35),
-      angle: particleRng.range(0, Math.PI * 2),
+      speed: particleRng.range(0.4, 1.4),
       color: particleRng.pick(palette.accents),
       blur: particleRng.range(0, 4),
       twinkleSpeed: particleRng.range(0.8, 3),
       twinklePhase: particleRng.range(0, Math.PI * 2),
+      fieldOffset: particleRng.range(0, 1000),
     });
   }
 
@@ -186,6 +277,90 @@ export const planScene = (rng: Rng, width: number, height: number): ScenePlan =>
       }
     : null;
 
+  const rayRng = rng.fork("rays");
+  const lightRays: LightRaysConfig | null = rayRng.bool(0.7)
+    ? {
+        // Pick an off-screen corner so the rays sweep diagonally across frame.
+        cx: rayRng.pick([-0.15, -0.05, 1.05, 1.15]),
+        cy: rayRng.pick([-0.15, -0.05, 1.05, 1.15]),
+        count: rayRng.int(3, 6),
+        spreadDeg: rayRng.range(35, 70),
+        baseAngleDeg: rayRng.range(0, 360),
+        rotateSpeed: rayRng.range(-3, 3),
+        beamWidth: rayRng.range(0.08, 0.18),
+        length: rayRng.range(1.4, 2.0),
+        color: rayRng.pick(palette.accents),
+        opacity: rayRng.range(0.18, 0.42),
+        pulseSpeed: rayRng.range(0.4, 1.2),
+        blur: rayRng.range(20, 60),
+      }
+    : null;
+
+  const ballRng = rng.fork("metaballs");
+  // Metaballs are visually dominant — only show them ~1 clip in 3 to keep
+  // the catalogue varied. When present they have moderate threshold so
+  // they read as soft liquid rather than hard cut-outs.
+  const metaballs: MetaballsPlan | null = ballRng.bool(0.35)
+    ? (() => {
+        const count = ballRng.int(2, 5);
+        const balls: MetaballConfig[] = [];
+        for (let i = 0; i < count; i++) {
+          balls.push({
+            cx: ballRng.range(0.2, 0.8) * width,
+            cy: ballRng.range(0.2, 0.8) * height,
+            radius: ballRng.range(0.05, 0.11) * longSide,
+            driftX: ballRng.range(0.08, 0.22) * width,
+            driftY: ballRng.range(0.06, 0.18) * height,
+            phaseX: ballRng.range(0, Math.PI * 2),
+            phaseY: ballRng.range(0, Math.PI * 2),
+            speed: ballRng.range(0.25, 0.7),
+          });
+        }
+        return {
+          color: ballRng.pick(palette.accents),
+          threshold: ballRng.range(10, 16),
+          blur: ballRng.range(22, 38),
+          balls,
+        };
+      })()
+    : null;
+
+  const fieldRng = rng.fork("flowfield");
+  const flowfield: FlowfieldConfig = {
+    scale: fieldRng.range(0.0009, 0.0022),
+    strength: fieldRng.range(70, 160),
+    timeDrift: fieldRng.range(0.05, 0.2),
+  };
+
+  const camRng = rng.fork("camera");
+  const camera: CameraConfig = {
+    baseScale: 1.06,
+    zoomDelta: camRng.range(0.05, 0.12),
+    panX: camRng.range(-0.04, 0.04),
+    panY: camRng.range(-0.03, 0.03),
+    tilt: camRng.range(-0.012, 0.012),
+    direction: camRng.bool(0.55) ? 1 : -1,
+  };
+
+  const reveal: RevealConfig = {
+    inFrames: 30,
+    inStartScale: 1.04,
+    outFrames: 15,
+  };
+
+  const evoRng = rng.fork("evolution");
+  const evolution: EvolutionConfig = {
+    hueShiftDeg: evoRng.range(-15, 15),
+    saturationPulse: evoRng.range(0.04, 0.1),
+  };
+
+  const bloomRng = rng.fork("bloom");
+  const bloom: BloomConfig = {
+    blur: bloomRng.range(5, 12),
+    brightness: bloomRng.range(1.25, 1.6),
+    intensity: bloomRng.range(0.7, 1.0),
+  };
+
   return {
     palette,
     background,
@@ -194,14 +369,17 @@ export const planScene = (rng: Rng, width: number, height: number): ScenePlan =>
     particles,
     ribbons,
     grid,
+    lightRays,
+    metaballs,
     noise: {
       intensity: rng.range(0.02, 0.06),
       scale: rng.range(1.2, 2.4),
     },
     vignette: rng.range(0.25, 0.55),
-    cameraSway: {
-      amplitude: rng.range(4, 14),
-      frequency: rng.range(0.3, 0.8),
-    },
+    flowfield,
+    camera,
+    reveal,
+    evolution,
+    bloom,
   };
 };
